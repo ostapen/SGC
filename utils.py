@@ -94,18 +94,21 @@ def load_citation(dataset_str="cora", normalization="AugNormAdj", cuda=True, loa
         idx_val = idx_train[-1*VAL_SIZE:]
         idx_train = idx_train[:-1*VAL_SIZE]
     else:
-        idx_train = range(len(y))
-        idx_val = range(len(y), len(y)+500)
+        idx_train = list(range(len(y)))
+        idx_val = list(range(len(y), len(y)+500))
 
     adj, features = preprocess_citation(adj, features, normalization)
-    #train_adj = sp.coo_matrix(adj.toarray()[idx_train, :][:, idx_train])
-    train_adj = None
+    train_adj = sp.coo_matrix(adj.toarray()[idx_train, :][:, idx_train])
+    val_adj = sp.coo_matrix(adj.toarray()[idx_val, :][:, idx_val])
+    #train_adj = None
     # porting to pytorch
     features = torch.FloatTensor(np.array(features.todense())).float()
     labels = torch.LongTensor(labels)
     labels = torch.max(labels, dim=1)[1]
     adj = sparse_mx_to_torch_sparse_tensor(adj).float()
-    #train_adj = sparse_mx_to_torch_sparse_tensor(train_adj).float()
+    import pdb; pdb.set_trace()
+    train_adj = sparse_mx_to_torch_sparse_tensor(train_adj).float()
+    val_adj = sparse_mx_to_torch_sparse_tensor(val_adj).float()
     idx_train = torch.LongTensor(idx_train)
     idx_val = torch.LongTensor(idx_val)
     idx_test = torch.LongTensor(idx_test)
@@ -113,12 +116,14 @@ def load_citation(dataset_str="cora", normalization="AugNormAdj", cuda=True, loa
     if cuda:
         features = features.cuda()
         adj = adj.cuda()
+        train_adj = train_adj.cuda()
+        val_adj = val_adj.cuda()
         labels = labels.cuda()
         idx_train = idx_train.cuda()
         idx_val = idx_val.cuda()
         idx_test = idx_test.cuda()
 
-    return adj, features, labels, idx_train, idx_val, idx_test
+    return adj, train_adj,val_adj, features, labels, idx_train, idx_val, idx_test
 
 def sgc_precompute(features, adj, degree):
     t = perf_counter()
