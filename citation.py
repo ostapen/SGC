@@ -63,7 +63,7 @@ def test_regression(model, test_features, test_labels):
 
 if args.model == "SGC":
     model, acc_val, train_time = train_regression(model, features[idx_train], labels[idx_train], features[idx_val], labels[idx_val],
-                     args.epochs, args.weight_decay, args.lr, args.dropout)
+                                                  args.epochs, args.weight_decay, args.lr, args.dropout)
     acc_test = test_regression(model, features[idx_test], labels[idx_test])
 
 print("Validation Accuracy: {:.4f} Test Accuracy: {:.4f}".format(acc_val, acc_test))

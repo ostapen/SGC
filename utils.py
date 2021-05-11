@@ -6,7 +6,9 @@ import pickle as pkl
 import networkx as nx
 from normalization import fetch_normalization, row_normalize
 from time import perf_counter
-
+from scipy.sparse import vstack
+ADD_TRAIN_SIZE = 460
+VAL_SIZE = 30
 def parse_index_file(filename):
     """Parse index file."""
     index = []
@@ -29,7 +31,7 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
 
-def load_citation(dataset_str="cora", normalization="AugNormAdj", cuda=True):
+def load_citation(dataset_str="cora", normalization="AugNormAdj", cuda=True, load_bigger_train = False):
     """
     Load Citation Networks Datasets.
     """
@@ -43,7 +45,28 @@ def load_citation(dataset_str="cora", normalization="AugNormAdj", cuda=True):
                 objects.append(pkl.load(f))
 
     x, y, tx, ty, allx, ally, graph = tuple(objects)
+
     test_idx_reorder = parse_index_file("data/ind.{}.test.index".format(dataset_str))
+    #sorted_indices = np.argsort(test_idx_reorder)
+    #test_idx_range = np.asarray(test_idx_reorder)[sorted_indices]
+    if load_bigger_train:
+        more_idx_train, idx_test = test_idx_reorder[:ADD_TRAIN_SIZE], test_idx_reorder[ADD_TRAIN_SIZE:]
+        test_idx_reorder = idx_test
+        allx = vstack([allx,tx[:ADD_TRAIN_SIZE]])
+        tx = tx[ADD_TRAIN_SIZE:]
+        ally = vstack([ally,ty[:ADD_TRAIN_SIZE]])
+        ty = ty[ADD_TRAIN_SIZE:]
+
+        # train_indices = test_idx_range[sorted_indices[:ADD_TRAIN_SIZE]] -min(test_idx_range)
+        # import pdb; pdb.set_trace()
+        # more_x_train = tx[train_indices]
+        # more_y_train = ty[train_indices]
+        # not_in_train_indices = [i for i in range(tx.shape[0]) if i not in train_indices]
+        # allx = vstack([more_x_train, allx])
+        # ally = vstack([more_y_train,ally])
+        # tx = tx[not_in_train_indices]
+        # ty = ty[not_in_train_indices]
+
     test_idx_range = np.sort(test_idx_reorder)
 
     if dataset_str == 'citeseer':
@@ -61,20 +84,28 @@ def load_citation(dataset_str="cora", normalization="AugNormAdj", cuda=True):
     features[test_idx_reorder, :] = features[test_idx_range, :]
     adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
     adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
-    labels = np.vstack((ally, ty))
-    labels[test_idx_reorder, :] = labels[test_idx_range, :]
 
+    labels = vstack((ally, ty)).toarray()
+    labels[test_idx_reorder, :] = labels[test_idx_range, :]
     idx_test = test_idx_range.tolist()
-    idx_train = range(len(y))
-    idx_val = range(len(y), len(y)+500)
+    if load_bigger_train:
+        idx_train = [i for i in range(len(y))] + more_idx_train
+        #idx_train = train_indices
+        idx_val = idx_train[-1*VAL_SIZE:]
+        idx_train = idx_train[:-1*VAL_SIZE]
+    else:
+        idx_train = range(len(y))
+        idx_val = range(len(y), len(y)+500)
 
     adj, features = preprocess_citation(adj, features, normalization)
-
+    #train_adj = sp.coo_matrix(adj.toarray()[idx_train, :][:, idx_train])
+    train_adj = None
     # porting to pytorch
     features = torch.FloatTensor(np.array(features.todense())).float()
     labels = torch.LongTensor(labels)
     labels = torch.max(labels, dim=1)[1]
     adj = sparse_mx_to_torch_sparse_tensor(adj).float()
+    #train_adj = sparse_mx_to_torch_sparse_tensor(train_adj).float()
     idx_train = torch.LongTensor(idx_train)
     idx_val = torch.LongTensor(idx_val)
     idx_test = torch.LongTensor(idx_test)
