@@ -106,7 +106,7 @@ def load_citation(dataset_str="cora", normalization="AugNormAdj", cuda=True, loa
     labels = torch.LongTensor(labels)
     labels = torch.max(labels, dim=1)[1]
     adj = sparse_mx_to_torch_sparse_tensor(adj).float()
-    import pdb; pdb.set_trace()
+
     train_adj = sparse_mx_to_torch_sparse_tensor(train_adj).float()
     val_adj = sparse_mx_to_torch_sparse_tensor(val_adj).float()
     idx_train = torch.LongTensor(idx_train)
